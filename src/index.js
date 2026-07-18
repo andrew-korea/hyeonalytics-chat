@@ -132,7 +132,9 @@ The direct answer goes here in one sentence.
 
 More detail and context goes in this second paragraph, separated by a blank line from the answer above.
 
-The user's message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English. The reference material below is in English regardless - translate it into ${replyLanguage} as needed.
+The user's message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English. The reference material below is in English regardless - translate the explanation into ${replyLanguage} as needed.
+
+IMPORTANT: keep the page title in the "From:" line exactly as written in English in the reference material below - do NOT translate or transliterate it into ${replyLanguage} (this avoids inconsistent mixed-script output). Only the answer and explanation sentences should be in ${replyLanguage}; never mix Chinese/Japanese characters into a Korean reply or vice versa.
 
 Reference material:
 ${context}`
