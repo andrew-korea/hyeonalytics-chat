@@ -73,7 +73,7 @@ async function extractSearchQuery(env, message) {
     const keywords = await callGroq(env, [
       {
         role: 'system',
-        content: 'Extract 2-5 concise search keywords (nouns/topics only, no filler words, no punctuation, no explanation) that would find relevant content for the user\'s question on a Pokémon TCG price and data-analysis website. The site\'s content is written in English, so ALWAYS translate the keywords into English regardless of what language the question is asked in. Respond with ONLY the English keywords, space-separated.',
+        content: 'The user is chatting with an assistant on a Pokémon TCG price and data-analysis website. If their message is a greeting, small talk, thanks, or anything else that is NOT actually asking about the website\'s content, respond with exactly NONE (nothing else). Otherwise, extract 2-5 concise search keywords (nouns/topics only, no filler words, no punctuation, no explanation) that would find relevant content for their question. The site\'s content is written in English, so ALWAYS translate the keywords into English regardless of what language the question is asked in. Respond with ONLY the English keywords, space-separated, or exactly NONE.',
       },
       { role: 'user', content: message },
     ], { temperature: 0, max_tokens: 30 })
@@ -110,14 +110,21 @@ async function handleChat(request, env) {
   const replyLanguage = detectLanguage(message)
 
   const searchQuery = await extractSearchQuery(env, message)
-  const searchResults = await searchSite(searchQuery)
+  const isCasual = searchQuery.trim().toUpperCase() === 'NONE'
+  const searchResults = isCasual ? [] : await searchSite(searchQuery)
   const pages = (await Promise.all(searchResults.map(fetchContent))).filter(Boolean)
 
-  const context = pages.length
-    ? pages.map(p => `### ${p.title} (${p.url})\n${p.text}`).join('\n\n')
-    : 'No matching pages were found on the site for this question.'
+  let systemPrompt
+  if (isCasual) {
+    systemPrompt = `You are a friendly assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. The user's message is casual conversation (a greeting, thanks, small talk, etc.), not a question about the site's content - just reply naturally and briefly, and you can mention you're happy to answer questions about Pokemon TCG prices, education, or investment topics on the site. Do not invent or reference any specific page content.
 
-  const systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. Answer the user's question using ONLY the reference material below, which was retrieved live from the site's own pages. If the answer isn't in the material, say you don't have that information on the site rather than guessing.
+The user's message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English.`
+  } else {
+    const context = pages.length
+      ? pages.map(p => `### ${p.title} (${p.url})\n${p.text}`).join('\n\n')
+      : 'No matching pages were found on the site for this question.'
+
+    systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. Answer the user's question using ONLY the reference material below, which was retrieved live from the site's own pages. If the answer isn't in the material, say you don't have that information on the site rather than guessing.
 
 You MUST format your reply using EXACTLY this template, with a real line break (newline character) between each part - never merge them into one paragraph:
 
@@ -138,6 +145,7 @@ IMPORTANT: keep the page title in the "From:" line exactly as written in English
 
 Reference material:
 ${context}`
+  }
 
   let reply
   try {
