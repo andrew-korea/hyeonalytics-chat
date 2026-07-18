@@ -203,6 +203,7 @@ ${context}`
   return Response.json({
     reply: reply || "Sorry, I couldn't generate a response.",
     sources: usedSource ? pages.map(p => ({ title: p.title, url: p.url })) : [],
+    _debug: { isCasual, searchQuery, replyLanguage, hasPriorTurns, pageCount: pages.length },
   }, { headers: CORS_HEADERS })
 }
 
