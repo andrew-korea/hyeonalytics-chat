@@ -13,7 +13,7 @@
     '#hyeo-chat-messages{flex:1;overflow-y:auto;padding:12px 16px;font-size:13px;color:#333;}' +
     '.hyeo-msg{margin-bottom:10px;line-height:1.4;}' +
     '.hyeo-msg.user{text-align:right;}' +
-    '.hyeo-msg .bubble{display:inline-block;padding:8px 12px;border-radius:10px;max-width:85%;text-align:left;}' +
+    '.hyeo-msg .bubble{display:inline-block;padding:8px 12px;border-radius:10px;max-width:85%;text-align:left;white-space:pre-wrap;}' +
     '.hyeo-msg.user .bubble{background:#000;color:#fff;}' +
     '.hyeo-msg.assistant .bubble{background:#f0f0f0;color:#333;}' +
     '.hyeo-msg.assistant .sources{margin-top:4px;font-size:11px;color:#999;}' +
