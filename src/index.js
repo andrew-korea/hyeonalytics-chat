@@ -153,34 +153,35 @@ ${hasPriorTurns
 Do not invent or reference any specific page content beyond what is already in the conversation above.
 
 The user's latest message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English.`
-  } else if (pages.length) {
-    const context = pages.map(p => `### ${p.title} (${p.url})\n${p.text}`).join('\n\n')
+  } else {
+    const context = pages.length
+      ? pages.map(p => `### ${p.title} (${p.url})\n${p.text}`).join('\n\n')
+      : '(none - search returned no pages)'
 
-    systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. The reference material below was retrieved live from the site's own pages for this question - prefer it and treat it as authoritative for anything it covers (prices, statistics, site-specific findings). You may also draw on your own general knowledge to explain background concepts or fill in gaps the material doesn't cover, but if the material and your general knowledge ever conflict, the material wins.
+    systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. Below is reference material retrieved via an automated site search for this question - the search is imperfect, so it may be empty, or it may contain a page that doesn't actually address what the user is asking.
 
-You MUST format your reply using EXACTLY this template, with a real line break (newline character) between each part - never merge them into one paragraph:
+First judge for yourself whether the reference material actually answers the user's question - do not assume it's relevant just because it was retrieved. Then reply in ONE of these two ways:
 
+1. If the material genuinely addresses the question: use it as the authoritative source (prefer it over general knowledge if they conflict), and format your reply using EXACTLY this template, with a real line break between each part - never merge them into one paragraph:
 From: <page title>
 <one direct sentence answering the question>
 
 <1-3 sentences of supporting explanation>
 
-Example of the exact shape required (do not copy the content, only the layout):
+2. If the material is empty, or does not actually address what the user is asking: ignore it completely, do NOT mention or cite it, and do NOT use the "From:" template at all - just answer the question directly and plainly from your own general knowledge of Pokemon TCG, card grading, the trading card market, etc., in 1-2 sentences optionally followed by 1-3 sentences of detail, separated by a blank line.
+
+Example of the exact shape required for option 1 (do not copy the content, only the layout):
 From: Example Page Title
 The direct answer goes here in one sentence.
 
 More detail and context goes in this second paragraph, separated by a blank line from the answer above.
 
-The user's message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English. The reference material below is in English regardless - translate the explanation into ${replyLanguage} as needed.
+The user's message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English. The reference material below is in English regardless - translate as needed.
 
-IMPORTANT: keep the page title in the "From:" line exactly as written in English in the reference material below - do NOT translate or transliterate it into ${replyLanguage} (this avoids inconsistent mixed-script output). Only the answer and explanation sentences should be in ${replyLanguage}; never mix Chinese/Japanese characters into a Korean reply or vice versa.
+IMPORTANT: if using option 1, keep the page title in the "From:" line exactly as written in English in the reference material below - do NOT translate or transliterate it into ${replyLanguage} (this avoids inconsistent mixed-script output). Only the answer and explanation sentences should be in ${replyLanguage}; never mix Chinese/Japanese characters into a Korean reply or vice versa.
 
 Reference material:
 ${context}`
-  } else {
-    systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. No matching page was found on the site for this question, so answer it directly using your own general knowledge of Pokemon TCG, card grading, the trading card market, etc. Answer plainly and naturally - do NOT use the "From: <page title>" template for this, since there is no site page to cite; just give a direct one or two sentence answer, optionally followed by 1-3 sentences of useful detail, separated by a blank line.
-
-The user's message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English.`
   }
 
   let reply
@@ -193,9 +194,15 @@ The user's message is written in ${replyLanguage}. You MUST write your entire re
     return Response.json({ error: 'Upstream chat error', detail: String(e) }, { status: 502, headers: CORS_HEADERS })
   }
 
+  // The model itself decides per-answer whether the retrieved page(s)
+  // actually address the question, signaled by whether it used the
+  // "From:" template - only surface sources when it did, so links never
+  // appear next to an answer that didn't actually draw from them.
+  const usedSource = /^From:/i.test(reply.trim())
+
   return Response.json({
     reply: reply || "Sorry, I couldn't generate a response.",
-    sources: pages.map(p => ({ title: p.title, url: p.url })),
+    sources: usedSource ? pages.map(p => ({ title: p.title, url: p.url })) : [],
   }, { headers: CORS_HEADERS })
 }
 
