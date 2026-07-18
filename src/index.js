@@ -46,6 +46,20 @@ async function searchSite(query) {
   return results.slice(0, MAX_RESULTS)
 }
 
+// WordPress's search requires the full query to match together, so it's
+// brittle to any extra/off-target word in a multi-word query. If the full
+// keyword string comes back empty, progressively drop the last word and
+// retry - this recovers cases like "PSA definition" (zero matches) down to
+// "PSA" (several matches) without needing a second Groq round-trip.
+async function searchSiteWithFallback(query) {
+  const words = query.trim().split(/\s+/).filter(Boolean)
+  for (let n = words.length; n >= 1; n--) {
+    const results = await searchSite(words.slice(0, n).join(' '))
+    if (results.length) return results
+  }
+  return []
+}
+
 async function callGroq(env, messages, opts) {
   const res = await fetch(GROQ_URL, {
     method: 'POST',
@@ -77,7 +91,7 @@ async function extractSearchQuery(env, history) {
     const keywords = await callGroq(env, [
       {
         role: 'system',
-        content: 'You are analyzing a conversation between a user and an assistant on a Pokémon TCG price and data-analysis website. Judge only the LATEST user message (the final message below), using the earlier messages as context to resolve anything it refers to. If the latest message is a greeting, small talk, thanks, or a short reaction/acknowledgment that is NOT actually asking for new information from the website (e.g. "really?", "ok", "thanks", "그래?"), respond with exactly NONE (nothing else). Otherwise, extract 2-5 concise search keywords (nouns/topics only, no filler words, no punctuation, no explanation) that would find relevant content for the latest message. The site\'s content is written in English, so ALWAYS translate the keywords into English regardless of what language the message is in. Respond with ONLY the English keywords, space-separated, or exactly NONE.',
+        content: 'You are analyzing a conversation between a user and an assistant on a Pokémon TCG price and data-analysis website. Judge only the LATEST user message (the final message below), using the earlier messages as context to resolve anything it refers to. If the latest message is a greeting, small talk, thanks, or a short reaction/acknowledgment that is NOT actually asking for new information from the website (e.g. "really?", "ok", "thanks", "그래?"), respond with exactly NONE (nothing else). Otherwise, extract 1-3 concise search keywords: the literal, concrete subject terms from the message ONLY (e.g. names, abbreviations, card/set names, specific topics). The website\'s search only matches literal words that appear in its articles, so NEVER add meta-words that describe the question rather than the subject (e.g. do not add "definition", "meaning", "explanation", "overview", "guide", "info") - if the user asks "what is X", the keyword is just X. The site\'s content is written in English, so ALWAYS translate the keywords into English regardless of what language the message is in. Respond with ONLY the English keywords, space-separated, or exactly NONE.',
       },
       ...history,
     ], { temperature: 0, max_tokens: 30 })
@@ -125,7 +139,7 @@ async function handleChat(request, env) {
 
   const searchQuery = await extractSearchQuery(env, history)
   const isCasual = searchQuery.trim().toUpperCase() === 'NONE'
-  const searchResults = isCasual ? [] : await searchSite(searchQuery)
+  const searchResults = isCasual ? [] : await searchSiteWithFallback(searchQuery)
   const pages = (await Promise.all(searchResults.map(fetchContent))).filter(Boolean)
 
   let systemPrompt
