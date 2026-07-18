@@ -103,16 +103,12 @@ async function handleChat(request, env) {
     ? pages.map(p => `### ${p.title} (${p.url})\n${p.text}`).join('\n\n')
     : 'No matching pages were found on the site for this question.'
 
-  const systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokémon TCG price database and data analysis website.
+  const systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. Answer the user's question using ONLY the reference material below, which was retrieved live from the site's own pages. If the answer isn't in the material, say you don't have that information on the site rather than guessing. Keep answers concise and friendly. Mention the page title when relevant.
 
-CRITICAL LANGUAGE RULE (follow this above everything else): the reference material below is written in English, but you must detect the language of the user's own message and write your ENTIRE reply in that same language - English, Korean (한국어), Chinese (中文), or Japanese (日本語). Translate anything from the English reference material into that language. Never reply in English if the user asked in Korean, Chinese, or Japanese.
+Language instruction: reply in the same language the user's message is written in. Supported languages are English, Korean, Chinese, and Japanese. The reference material is in English regardless of which language you reply in - translate it as needed.
 
-Answer the user's question using ONLY the reference material below. If the answer isn't in the material, say (in the user's own language) that you don't have that information on the site rather than guessing. Keep answers concise and friendly. Mention the page title when relevant.
-
-Reference material (English):
-${context}
-
-Reminder: write your entire reply in the same language as the user's message, not in English, unless the user wrote in English.`
+Reference material:
+${context}`
 
   let reply
   try {
