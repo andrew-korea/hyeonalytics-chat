@@ -34,6 +34,43 @@ async function searchSite(query) {
   return results.slice(0, MAX_RESULTS)
 }
 
+async function callGroq(env, messages, opts) {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${env.GROQ_API_KEY || ''}`,
+    },
+    body: JSON.stringify({ model: GROQ_MODEL, messages, ...opts }),
+  })
+  if (!res.ok) throw new Error(`Groq error ${res.status}: ${await res.text()}`)
+  const data = await res.json()
+  return data.choices && data.choices[0] && data.choices[0].message
+    ? data.choices[0].message.content.trim()
+    : ''
+}
+
+// WordPress's core search endpoint matches best on a handful of concrete
+// keywords - long natural-language questions (with "which", "is", "for",
+// filler words, punctuation) often return zero results even when highly
+// relevant content exists. Use a fast Groq call to distill the question
+// into a short keyword query before searching, rather than searching on
+// the raw question text.
+async function extractSearchQuery(env, message) {
+  try {
+    const keywords = await callGroq(env, [
+      {
+        role: 'system',
+        content: 'Extract 2-5 concise search keywords (nouns/topics only, no filler words, no punctuation, no explanation) that would find relevant content for the user\'s question on a Pokémon TCG price and data-analysis website. Respond with ONLY the keywords, space-separated.',
+      },
+      { role: 'user', content: message },
+    ], { temperature: 0, max_tokens: 30 })
+    return keywords || message
+  } catch (e) {
+    return message
+  }
+}
+
 async function fetchContent(result) {
   const selfLink = result._links && result._links.self && result._links.self[0] && result._links.self[0].href
   if (!selfLink) return null
@@ -58,7 +95,8 @@ async function handleChat(request, env) {
     return Response.json({ error: 'Missing message' }, { status: 400, headers: CORS_HEADERS })
   }
 
-  const searchResults = await searchSite(message)
+  const searchQuery = await extractSearchQuery(env, message)
+  const searchResults = await searchSite(searchQuery)
   const pages = (await Promise.all(searchResults.map(fetchContent))).filter(Boolean)
 
   const context = pages.length
@@ -67,35 +105,18 @@ async function handleChat(request, env) {
 
   const systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokémon TCG price database and data analysis website. Answer the user's question using ONLY the reference material below, which was retrieved live from the site's own pages. If the answer isn't in the material, say you don't have that information on the site rather than guessing. Keep answers concise and friendly. Mention the page title when relevant.\n\nReference material:\n${context}`
 
-  const groqRes = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${env.GROQ_API_KEY || ''}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message },
-      ],
-      temperature: 0.3,
-      max_tokens: 500,
-    }),
-  })
-
-  if (!groqRes.ok) {
-    const errText = await groqRes.text()
-    return Response.json({ error: 'Upstream chat error', detail: errText }, { status: 502, headers: CORS_HEADERS })
+  let reply
+  try {
+    reply = await callGroq(env, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: message },
+    ], { temperature: 0.3, max_tokens: 500 })
+  } catch (e) {
+    return Response.json({ error: 'Upstream chat error', detail: String(e) }, { status: 502, headers: CORS_HEADERS })
   }
 
-  const groqData = await groqRes.json()
-  const reply = groqData.choices && groqData.choices[0] && groqData.choices[0].message
-    ? groqData.choices[0].message.content
-    : "Sorry, I couldn't generate a response."
-
   return Response.json({
-    reply,
+    reply: reply || "Sorry, I couldn't generate a response.",
     sources: pages.map(p => ({ title: p.title, url: p.url })),
   }, { headers: CORS_HEADERS })
 }
