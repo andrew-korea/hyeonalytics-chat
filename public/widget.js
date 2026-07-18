@@ -6,7 +6,7 @@
     '#hyeo-chat-btn{position:fixed;bottom:32px;right:92px;width:48px;height:48px;border-radius:50%;background-color:#000000;color:#ffffff;display:flex;align-items:center;justify-content:center;text-decoration:none;font-size:22px;line-height:1;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,0.35);border:none;cursor:pointer;}' +
     '#hyeo-chat-btn:hover{background-color:#1a1a1a;}' +
     '@media (max-width: 782px){#hyeo-chat-btn{display:none;}}' +
-    '#hyeo-chat-panel{position:fixed;bottom:92px;right:32px;width:320px;max-width:calc(100vw - 48px);height:440px;max-height:calc(100vh - 140px);background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.25);display:none;flex-direction:column;overflow:hidden;z-index:9999;font-family:sans-serif;}' +
+    '#hyeo-chat-panel{position:fixed;bottom:92px;right:32px;width:480px;max-width:calc(100vw - 48px);height:660px;max-height:calc(100vh - 140px);background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.25);display:none;flex-direction:column;overflow:hidden;z-index:9999;font-family:sans-serif;}' +
     '#hyeo-chat-panel.open{display:flex;}' +
     '#hyeo-chat-header{background:#000;color:#fff;padding:12px 16px;font-size:14px;font-weight:bold;display:flex;justify-content:space-between;align-items:center;}' +
     '#hyeo-chat-close{background:none;border:none;color:#fff;font-size:18px;cursor:pointer;line-height:1;}' +
