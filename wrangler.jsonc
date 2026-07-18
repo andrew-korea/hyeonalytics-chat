@@ -1,0 +1,25 @@
+{
+  "name": "hyeonalytics-chat",
+  "account_id": "c20ecd860a2da4491c17b7620ab5058a",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-18",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": false,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "head_sampling_rate": 1
+    }
+  }
+}
