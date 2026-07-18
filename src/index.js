@@ -120,6 +120,7 @@ async function handleChat(request, env) {
   return Response.json({
     reply: reply || "Sorry, I couldn't generate a response.",
     sources: pages.map(p => ({ title: p.title, url: p.url })),
+    _debug: { searchQuery, resultCount: searchResults.length, resultTitles: searchResults.map(r => r.title) },
   }, { headers: CORS_HEADERS })
 }
 
