@@ -160,7 +160,6 @@ ${context}`
   return Response.json({
     reply: reply || "Sorry, I couldn't generate a response.",
     sources: pages.map(p => ({ title: p.title, url: p.url })),
-    _debug: { searchQuery, isCasual },
   }, { headers: CORS_HEADERS })
 }
 
