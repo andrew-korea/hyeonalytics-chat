@@ -61,7 +61,7 @@ async function extractSearchQuery(env, message) {
     const keywords = await callGroq(env, [
       {
         role: 'system',
-        content: 'Extract 2-5 concise search keywords (nouns/topics only, no filler words, no punctuation, no explanation) that would find relevant content for the user\'s question on a Pokémon TCG price and data-analysis website. Respond with ONLY the keywords, space-separated.',
+        content: 'Extract 2-5 concise search keywords (nouns/topics only, no filler words, no punctuation, no explanation) that would find relevant content for the user\'s question on a Pokémon TCG price and data-analysis website. The site\'s content is written in English, so ALWAYS translate the keywords into English regardless of what language the question is asked in. Respond with ONLY the English keywords, space-separated.',
       },
       { role: 'user', content: message },
     ], { temperature: 0, max_tokens: 30 })
@@ -103,7 +103,7 @@ async function handleChat(request, env) {
     ? pages.map(p => `### ${p.title} (${p.url})\n${p.text}`).join('\n\n')
     : 'No matching pages were found on the site for this question.'
 
-  const systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokémon TCG price database and data analysis website. Answer the user's question using ONLY the reference material below, which was retrieved live from the site's own pages. If the answer isn't in the material, say you don't have that information on the site rather than guessing. Keep answers concise and friendly. Mention the page title when relevant.\n\nReference material:\n${context}`
+  const systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokémon TCG price database and data analysis website. Answer the user's question using ONLY the reference material below, which was retrieved live from the site's own pages (the material itself is in English). If the answer isn't in the material, say you don't have that information on the site rather than guessing. Keep answers concise and friendly. Mention the page title when relevant. IMPORTANT: Always reply in the same language the user asked their question in - support English, Korean, Chinese, and Japanese, translating the relevant material into that language as needed.\n\nReference material:\n${context}`
 
   let reply
   try {
