@@ -153,12 +153,10 @@ ${hasPriorTurns
 Do not invent or reference any specific page content beyond what is already in the conversation above.
 
 The user's latest message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English.`
-  } else {
-    const context = pages.length
-      ? pages.map(p => `### ${p.title} (${p.url})\n${p.text}`).join('\n\n')
-      : 'No matching pages were found on the site for this question.'
+  } else if (pages.length) {
+    const context = pages.map(p => `### ${p.title} (${p.url})\n${p.text}`).join('\n\n')
 
-    systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. Answer the user's question using ONLY the reference material below, which was retrieved live from the site's own pages. If the answer isn't in the material, say you don't have that information on the site rather than guessing.
+    systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. The reference material below was retrieved live from the site's own pages for this question - prefer it and treat it as authoritative for anything it covers (prices, statistics, site-specific findings). You may also draw on your own general knowledge to explain background concepts or fill in gaps the material doesn't cover, but if the material and your general knowledge ever conflict, the material wins.
 
 You MUST format your reply using EXACTLY this template, with a real line break (newline character) between each part - never merge them into one paragraph:
 
@@ -179,6 +177,10 @@ IMPORTANT: keep the page title in the "From:" line exactly as written in English
 
 Reference material:
 ${context}`
+  } else {
+    systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. No matching page was found on the site for this question, so answer it directly using your own general knowledge of Pokemon TCG, card grading, the trading card market, etc. Answer plainly and naturally - do NOT use the "From: <page title>" template for this, since there is no site page to cite; just give a direct one or two sentence answer, optionally followed by 1-3 sentences of useful detail, separated by a blank line.
+
+The user's message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English.`
   }
 
   let reply
