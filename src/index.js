@@ -96,9 +96,7 @@ async function handleChat(request, env) {
   }
 
   const searchQuery = await extractSearchQuery(env, message)
-  console.log(JSON.stringify({ debug: 'search-query', message, searchQuery }))
   const searchResults = await searchSite(searchQuery)
-  console.log(JSON.stringify({ debug: 'search-results', count: searchResults.length, titles: searchResults.map(r => r.title) }))
   const pages = (await Promise.all(searchResults.map(fetchContent))).filter(Boolean)
 
   const context = pages.length
@@ -118,7 +116,7 @@ async function handleChat(request, env) {
   }
 
   return Response.json({
-    reply: `[BUILD-MARKER-${searchQuery}-${searchResults.length}] ` + (reply || "Sorry, I couldn't generate a response."),
+    reply: reply || "Sorry, I couldn't generate a response.",
     sources: pages.map(p => ({ title: p.title, url: p.url })),
   }, { headers: CORS_HEADERS })
 }
@@ -140,6 +138,3 @@ export default {
     return env.ASSETS.fetch(request)
   },
 }
-// auto-deploy test 2026-07-18T14:47:23Z
-// auto-deploy retest 2026-07-18T14:50:24Z
-// full pipeline retest 2026-07-18T14:51:55Z
