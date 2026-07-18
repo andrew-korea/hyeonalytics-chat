@@ -67,19 +67,23 @@ async function callGroq(env, messages, opts) {
 // filler words, punctuation) often return zero results even when highly
 // relevant content exists. Use a fast Groq call to distill the question
 // into a short keyword query before searching, rather than searching on
-// the raw question text.
-async function extractSearchQuery(env, message) {
+// the raw question text. The full conversation history (not just the
+// latest message) is passed in so short reactive follow-ups ("그래?",
+// "really?", "what about that one") can be resolved in context instead of
+// being misread as a standalone, contentless message.
+async function extractSearchQuery(env, history) {
+  const latest = history[history.length - 1].content
   try {
     const keywords = await callGroq(env, [
       {
         role: 'system',
-        content: 'The user is chatting with an assistant on a Pokémon TCG price and data-analysis website. If their message is a greeting, small talk, thanks, or anything else that is NOT actually asking about the website\'s content, respond with exactly NONE (nothing else). Otherwise, extract 2-5 concise search keywords (nouns/topics only, no filler words, no punctuation, no explanation) that would find relevant content for their question. The site\'s content is written in English, so ALWAYS translate the keywords into English regardless of what language the question is asked in. Respond with ONLY the English keywords, space-separated, or exactly NONE.',
+        content: 'You are analyzing a conversation between a user and an assistant on a Pokémon TCG price and data-analysis website. Judge only the LATEST user message (the final message below), using the earlier messages as context to resolve anything it refers to. If the latest message is a greeting, small talk, thanks, or a short reaction/acknowledgment that is NOT actually asking for new information from the website (e.g. "really?", "ok", "thanks", "그래?"), respond with exactly NONE (nothing else). Otherwise, extract 2-5 concise search keywords (nouns/topics only, no filler words, no punctuation, no explanation) that would find relevant content for the latest message. The site\'s content is written in English, so ALWAYS translate the keywords into English regardless of what language the message is in. Respond with ONLY the English keywords, space-separated, or exactly NONE.',
       },
-      { role: 'user', content: message },
+      ...history,
     ], { temperature: 0, max_tokens: 30 })
-    return keywords || message
+    return keywords || latest
   } catch (e) {
-    return message
+    return latest
   }
 }
 
@@ -94,6 +98,10 @@ async function fetchContent(result) {
   return { title, url: result.url, text: text.slice(0, MAX_CONTENT_CHARS) }
 }
 
+// How many prior turns to carry into Groq calls. Bounds token usage while
+// still giving the model enough context to resolve short follow-ups.
+const MAX_HISTORY_MESSAGES = 12
+
 async function handleChat(request, env) {
   let body
   try {
@@ -102,23 +110,35 @@ async function handleChat(request, env) {
     return Response.json({ error: 'Invalid JSON body' }, { status: 400, headers: CORS_HEADERS })
   }
 
-  const message = (body.message || '').trim()
-  if (!message) {
+  const rawMessages = Array.isArray(body.messages) ? body.messages : (body.message ? [{ role: 'user', content: body.message }] : [])
+  const history = rawMessages
+    .filter(m => m && typeof m.content === 'string' && m.content.trim() && (m.role === 'user' || m.role === 'assistant'))
+    .slice(-MAX_HISTORY_MESSAGES)
+
+  if (!history.length || history[history.length - 1].role !== 'user') {
     return Response.json({ error: 'Missing message' }, { status: 400, headers: CORS_HEADERS })
   }
 
+  const message = history[history.length - 1].content
+  const hasPriorTurns = history.length > 1
   const replyLanguage = detectLanguage(message)
 
-  const searchQuery = await extractSearchQuery(env, message)
+  const searchQuery = await extractSearchQuery(env, history)
   const isCasual = searchQuery.trim().toUpperCase() === 'NONE'
   const searchResults = isCasual ? [] : await searchSite(searchQuery)
   const pages = (await Promise.all(searchResults.map(fetchContent))).filter(Boolean)
 
   let systemPrompt
   if (isCasual) {
-    systemPrompt = `You are a friendly assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. The user's message is casual conversation (a greeting, thanks, small talk, etc.), not a question about the site's content - just reply naturally and briefly, and you can mention you're happy to answer questions about Pokemon TCG prices, education, or investment topics on the site. Do not invent or reference any specific page content.
+    systemPrompt = `You are a friendly assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. The user's latest message is casual conversation (a greeting, thanks, small talk, a short reaction/acknowledgment, etc.), not a new question about the site's content.
 
-The user's message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English.`
+${hasPriorTurns
+  ? 'This is not the first message in the conversation - the messages above are the real prior exchange. Respond naturally and IN CONTEXT of that conversation (e.g. if they are reacting to your last answer, react back appropriately). Do NOT reset to a generic greeting like "Hi" when there is already a conversation underway.'
+  : 'This is the first message in the conversation, so greet the user naturally and briefly, and you can mention you\'re happy to answer questions about Pokemon TCG prices, education, or investment topics on the site.'}
+
+Do not invent or reference any specific page content beyond what is already in the conversation above.
+
+The user's latest message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English.`
   } else {
     const context = pages.length
       ? pages.map(p => `### ${p.title} (${p.url})\n${p.text}`).join('\n\n')
@@ -151,7 +171,7 @@ ${context}`
   try {
     reply = await callGroq(env, [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: message },
+      ...history,
     ], { temperature: 0.3, max_tokens: 500 })
   } catch (e) {
     return Response.json({ error: 'Upstream chat error', detail: String(e) }, { status: 502, headers: CORS_HEADERS })

@@ -45,6 +45,7 @@
   var inputEl = document.getElementById('hyeo-chat-input');
   var sendBtn = document.getElementById('hyeo-chat-send');
   var opened = false;
+  var history = [];
 
   function toggle() {
     opened = !opened;
@@ -86,6 +87,7 @@
     var text = inputEl.value.trim();
     if (!text) return;
     addMessage('user', text);
+    history.push({ role: 'user', content: text });
     inputEl.value = '';
     sendBtn.disabled = true;
 
@@ -94,7 +96,7 @@
     fetch(BASE + '/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
+      body: JSON.stringify({ messages: history }),
     })
       .then(function(res) { return res.json().then(function(data) { return { res: res, data: data }; }); })
       .then(function(r) {
@@ -104,6 +106,7 @@
           return;
         }
         addMessage('assistant', r.data.reply, r.data.sources);
+        history.push({ role: 'assistant', content: r.data.reply });
       })
       .catch(function() {
         loadingRow.remove();
