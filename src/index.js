@@ -96,7 +96,9 @@ async function handleChat(request, env) {
   }
 
   const searchQuery = await extractSearchQuery(env, message)
+  console.log(JSON.stringify({ debug: 'search-query', message, searchQuery }))
   const searchResults = await searchSite(searchQuery)
+  console.log(JSON.stringify({ debug: 'search-results', count: searchResults.length, titles: searchResults.map(r => r.title) }))
   const pages = (await Promise.all(searchResults.map(fetchContent))).filter(Boolean)
 
   const context = pages.length
