@@ -10,6 +10,18 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
+// Relying on the model to infer the input language from a general
+// instruction is unreliable - it's competing against the English-heavy
+// reference material and sometimes reverts to English anyway. Detect the
+// language deterministically from Unicode script ranges instead, and tell
+// the model explicitly and unambiguously which language to reply in.
+function detectLanguage(text) {
+  if (/[぀-ゟ゠-ヿ]/.test(text)) return 'Japanese'
+  if (/[가-힣ᄀ-ᇿ]/.test(text)) return 'Korean'
+  if (/[一-鿿]/.test(text)) return 'Chinese'
+  return 'English'
+}
+
 function stripHtml(html) {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -95,6 +107,8 @@ async function handleChat(request, env) {
     return Response.json({ error: 'Missing message' }, { status: 400, headers: CORS_HEADERS })
   }
 
+  const replyLanguage = detectLanguage(message)
+
   const searchQuery = await extractSearchQuery(env, message)
   const searchResults = await searchSite(searchQuery)
   const pages = (await Promise.all(searchResults.map(fetchContent))).filter(Boolean)
@@ -105,7 +119,7 @@ async function handleChat(request, env) {
 
   const systemPrompt = `You are a helpful assistant embedded on Hyeonalytics (hyeonalytics.com), a Pokemon TCG price database and data analysis website. Answer the user's question using ONLY the reference material below, which was retrieved live from the site's own pages. If the answer isn't in the material, say you don't have that information on the site rather than guessing. Keep answers concise and friendly. Mention the page title when relevant.
 
-Language instruction: reply in the same language the user's message is written in. Supported languages are English, Korean, Chinese, and Japanese. The reference material is in English regardless of which language you reply in - translate it as needed.
+The user's message is written in ${replyLanguage}. You MUST write your entire reply in ${replyLanguage} - do not use English unless ${replyLanguage} is English. The reference material below is in English regardless - translate it into ${replyLanguage} as needed.
 
 Reference material:
 ${context}`
